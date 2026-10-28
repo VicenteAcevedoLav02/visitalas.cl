@@ -1,0 +1,24 @@
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  /* Cutting-table / matte mat skin */
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.08), transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(0, 0, 0, 0.12), transparent 55%),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.03) 0 1px,
+      transparent 1px 3px
+    ),
+    linear-gradient(145deg, #5c4a3a 0%, #3f3228 40%, #2e241c 100%);
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}

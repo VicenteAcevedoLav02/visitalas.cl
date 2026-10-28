@@ -1,26 +1,29 @@
 ---
 alwaysApply: true
 ---
-This is a pnpm + Turborepo monorepo for **visitalas.cl**, a POC SaaS tooling demo for real-estate agents, shown from the vincente.cl portfolio.
+This is a **frontend-only** Vite + React + TypeScript POC for **visitalas.cl**, a portfolio demo for real-estate agents (linked from vincente.cl).
 
-## Product context
-- Target users: real-estate agents.
-- Full vision (later): landing + tooling + portfolio + metrics generator.
-- **Current scope: only the tool frontend and tool backend.** Do not build marketing landing, deploy pipelines, auth products, billing, or production infra unless explicitly asked.
+## Product purpose
+Agents sketch a **2D floor plan** by drawing axis-aligned rectangles that merge into polygons (overlap or shared edge). That plan becomes a light **3D “maze”** of rectangular wall planes with photos mapped onto them. The agent walks the space in-browser like a simple FPS / Minecraft-style first-person view.
+
+**Planned flow (build incrementally):**
+1. Paint-like workboard: draw/merge rectangles; edit sides later.
+2. Generate 3D from the 2D figure (walls = sides); pick spawn + ceiling height.
+3. In walk mode, each wall has an upload control.
+4. Flat wall editor: place/transform the photo (Control-T style).
+
+**UI language:** Spanish for now.
+
+## Current scope
+- **Only the tool frontend.** The app home screen *is* the tool (no marketing landing).
+- Do **not** build: backend, Turborepo monorepo, auth, billing, deploy/CI, MLS integrations, or production infra unless explicitly asked.
+- Mock/stub data is fine. Prefer simple, explicit solutions over enterprise architecture.
 
 ## Architecture
-- Apps live in `apps/`, shared code in `packages/`.
-- Frontend: React 18+, TypeScript (strict), Vite. Prefer CSS Modules or plain CSS. Redux Toolkit for client state.
-- Backend: TypeScript (Node). Keep API small, typed, and local-dev friendly for a POC.
-- Shared UI / types / config go in `packages/` when reused.
-- Never install packages at the root unless they are monorepo/dev tooling; use `pnpm --filter <app> add <pkg>`.
-
-## Working rules
-- This is a **POC for the portfolio**, not a production SaaS. Prefer simple, explicit solutions over enterprise architecture.
-- No tests unless explicitly requested.
-- No deploy / hosting / CI decisions unless explicitly requested.
-- Do not invent irreversible product decisions (pricing, multi-tenant auth, legal compliance, real MLS integrations) — stub or mock data instead.
+- Single Vite app at repo root (not a monorepo until something is actually shared).
+- React 18+, TypeScript (strict), Vite. Prefer CSS Modules or plain CSS. Redux Toolkit for client state.
+- Never invent irreversible product decisions (pricing, multi-tenant auth, legal compliance) — stub instead.
 - Write small, typed modules. No `any`.
-- Do not modify files outside the app/package named in the prompt.
-- After substantive changes, make sure the relevant `pnpm --filter <app> build` (or equivalent typecheck) passes.
+- No tests unless explicitly requested.
+- After substantive changes, make sure `pnpm build` (or equivalent typecheck) passes.
 - Explain briefly what you changed at the end.
