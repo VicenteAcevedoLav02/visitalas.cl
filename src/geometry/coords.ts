@@ -1,22 +1,48 @@
 import type { Point, Rect } from "./types";
 
-/** Pixels per meter on the workboard grid. */
+/** Base pixels per meter on the workboard grid (zoom = 1). */
 export const PX_PER_METER = 40;
+
+export const MIN_ZOOM = 1;
+export const MAX_ZOOM = 8;
+export const ZOOM_STEP = 0.1;
 
 /** Ignore accidental tiny drags below this size (meters). */
 export const MIN_RECT_METERS = 0.1;
 
-export function screenToWorld(sx: number, sy: number, originX: number, originY: number): Point {
+export function clampZoom(zoom: number): number {
+  const stepped = Math.round(zoom / ZOOM_STEP) * ZOOM_STEP;
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(stepped.toFixed(2))));
+}
+
+export function pixelsPerMeter(zoom: number): number {
+  return PX_PER_METER * clampZoom(zoom);
+}
+
+export function screenToWorld(
+  sx: number,
+  sy: number,
+  originX: number,
+  originY: number,
+  zoom = 1,
+): Point {
+  const ppm = pixelsPerMeter(zoom);
   return {
-    x: (sx - originX) / PX_PER_METER,
-    y: (sy - originY) / PX_PER_METER,
+    x: (sx - originX) / ppm,
+    y: (sy - originY) / ppm,
   };
 }
 
-export function worldToScreen(p: Point, originX: number, originY: number): Point {
+export function worldToScreen(
+  p: Point,
+  originX: number,
+  originY: number,
+  zoom = 1,
+): Point {
+  const ppm = pixelsPerMeter(zoom);
   return {
-    x: originX + p.x * PX_PER_METER,
-    y: originY + p.y * PX_PER_METER,
+    x: originX + p.x * ppm,
+    y: originY + p.y * ppm,
   };
 }
 

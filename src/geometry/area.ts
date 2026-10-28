@@ -19,6 +19,13 @@ export function polygonArea(ring: Point[]): number {
   return Math.abs(sum) / 2;
 }
 
+/** Outer area minus holes. */
+export function figureArea(poly: Polygon): number {
+  const holes = poly.holes ?? [];
+  const holeSum = holes.reduce((acc, hole) => acc + polygonArea(hole), 0);
+  return Math.max(0, polygonArea(poly.ring) - holeSum);
+}
+
 export function totalArea(polygons: Polygon[]): number {
-  return polygons.reduce((acc, poly) => acc + polygonArea(poly.ring), 0);
+  return polygons.reduce((acc, poly) => acc + figureArea(poly), 0);
 }

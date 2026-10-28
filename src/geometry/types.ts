@@ -12,7 +12,17 @@ export type Rect = {
   height: number;
 };
 
-/** Closed outer ring: first point equals last, or treated as closed. */
+/**
+ * Floor figure: outer ring plus optional holes (inner rings).
+ * Holes are empty cutouts (e.g. erase a rect inside a larger polygon).
+ */
 export type Polygon = {
   ring: Point[];
+  holes?: Point[][];
+};
+
+/** Axis-aligned or general wall/door segment in world meters. */
+export type Segment = {
+  a: Point;
+  b: Point;
 };
