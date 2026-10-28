@@ -1,0 +1,26 @@
+---
+alwaysApply: true
+---
+This is a pnpm + Turborepo monorepo for **visitalas.cl**, a POC SaaS tooling demo for real-estate agents, shown from the vincente.cl portfolio.
+
+## Product context
+- Target users: real-estate agents.
+- Full vision (later): landing + tooling + portfolio + metrics generator.
+- **Current scope: only the tool frontend and tool backend.** Do not build marketing landing, deploy pipelines, auth products, billing, or production infra unless explicitly asked.
+
+## Architecture
+- Apps live in `apps/`, shared code in `packages/`.
+- Frontend: React 18+, TypeScript (strict), Vite. Prefer CSS Modules or plain CSS. Redux Toolkit for client state.
+- Backend: TypeScript (Node). Keep API small, typed, and local-dev friendly for a POC.
+- Shared UI / types / config go in `packages/` when reused.
+- Never install packages at the root unless they are monorepo/dev tooling; use `pnpm --filter <app> add <pkg>`.
+
+## Working rules
+- This is a **POC for the portfolio**, not a production SaaS. Prefer simple, explicit solutions over enterprise architecture.
+- No tests unless explicitly requested.
+- No deploy / hosting / CI decisions unless explicitly requested.
+- Do not invent irreversible product decisions (pricing, multi-tenant auth, legal compliance, real MLS integrations) — stub or mock data instead.
+- Write small, typed modules. No `any`.
+- Do not modify files outside the app/package named in the prompt.
+- After substantive changes, make sure the relevant `pnpm --filter <app> build` (or equivalent typecheck) passes.
+- Explain briefly what you changed at the end.
