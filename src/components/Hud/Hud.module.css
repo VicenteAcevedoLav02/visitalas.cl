@@ -147,3 +147,107 @@
   accent-color: #0f2a1c;
   cursor: pointer;
 }
+
+.plansBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.plansList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 11rem;
+  overflow-y: auto;
+}
+
+.planItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 2px;
+  background: #fafafa;
+}
+
+.planItemSelected {
+  border-color: #0f2a1c;
+  background: #f2f6f3;
+}
+
+.planSelect {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planSelect:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.planName {
+  font-size: 0.78rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.planMeta {
+  font-size: 0.65rem;
+  opacity: 0.65;
+}
+
+.planActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.2rem;
+}
+
+.planActionBtn {
+  margin: 0;
+  padding: 0.25rem 0.15rem;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+  background: #fff;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.planActionBtn:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.planActionBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.plansStatus {
+  margin: 0;
+  font-size: 0.68rem;
+  opacity: 0.75;
+}
+
+.hiddenFile {
+  display: none;
+}

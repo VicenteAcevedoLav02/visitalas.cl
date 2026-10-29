@@ -19,6 +19,19 @@ export type PlanSnapshot = {
   walls: Segment[];
 };
 
+/** Board + history payload used when loading a saved plan. */
+export type PlanLoadPayload = {
+  polygons: Polygon[];
+  walls: Segment[];
+  past: PlanSnapshot[];
+  future: PlanSnapshot[];
+  doorWidth: number;
+  wallThickness: number;
+  zoom: number;
+  panX: number;
+  panY: number;
+};
+
 export type MergeReview = {
   pendingRect: Rect;
   sharedEdges: Segment[];
@@ -263,6 +276,22 @@ const floorPlanSlice = createSlice({
       state.polygons = next?.polygons ?? [];
       state.walls = next?.walls ?? [];
     },
+    /** Replace board + undo/redo stacks from a saved plan document. */
+    loadPlanDocument(state, action: PayloadAction<PlanLoadPayload>) {
+      const doc = action.payload;
+      state.polygons = clonePolygons(doc.polygons);
+      state.walls = cloneSegments(doc.walls);
+      state.past = doc.past.map((snap) => cloneSnapshot(snap.polygons, snap.walls));
+      state.future = doc.future.map((snap) => cloneSnapshot(snap.polygons, snap.walls));
+      state.doorWidth = Math.round(Math.max(0, doc.doorWidth) * 100) / 100;
+      state.wallThickness = Math.round(Math.max(0, doc.wallThickness) * 100) / 100;
+      state.zoom = clampZoom(doc.zoom);
+      state.panX = doc.panX;
+      state.panY = doc.panY;
+      state.draftStart = null;
+      state.draftRect = null;
+      state.mergeReview = null;
+    },
   },
 });
 
@@ -285,6 +314,7 @@ export const {
   confirmMergeReview,
   undo,
   redo,
+  loadPlanDocument,
 } = floorPlanSlice.actions;
 
 export const floorPlanReducer = floorPlanSlice.reducer;

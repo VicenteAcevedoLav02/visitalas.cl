@@ -18,6 +18,7 @@ import {
   type ToolMode,
 } from "../../store/floorPlanSlice";
 import styles from "./Hud.module.css";
+import { SavedPlans } from "./SavedPlans";
 
 function formatArea(m2: number): string {
   if (m2 === 0) {
@@ -156,6 +157,8 @@ export function Hud() {
           {MIN_ZOOM}× – {MAX_ZOOM}× · paso {ZOOM_STEP.toLocaleString("es-CL")}
         </p>
       </label>
+
+      <SavedPlans />
     </aside>
   );
 }

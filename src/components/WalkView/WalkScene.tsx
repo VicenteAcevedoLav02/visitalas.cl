@@ -1,7 +1,7 @@
 import { PointerLockControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { Euler, Vector3 } from "three";
+import { Euler, PerspectiveCamera, Vector3 } from "three";
 import {
   clearSpawnFromWalls,
   collectWallSegments,
@@ -11,7 +11,6 @@ import type { Point, Polygon, Segment } from "../../geometry/types";
 import { FloorCeiling } from "./FloorCeiling";
 import { WallMeshes } from "./WallMeshes";
 
-const EYE_HEIGHT = 1.8;
 const MOVE_SPEED = 5;
 const PLAYER_RADIUS = 0.18;
 
@@ -19,6 +18,8 @@ type WalkSceneProps = {
   polygons: Polygon[];
   internalWalls: Segment[];
   ceilingHeightM: number;
+  eyeHeightM: number;
+  fovDeg: number;
   wallThickness: number;
   spawn: Point;
   onPose: (pose: { x: number; y: number; yaw: number }) => void;
@@ -35,20 +36,32 @@ const MOVE_CODES = new Set([
   "ArrowRight",
 ]);
 
+function clampEyeHeight(eyeHeightM: number, ceilingHeightM: number): number {
+  const maxEye = Math.max(0.3, ceilingHeightM - 0.05);
+  return Math.min(Math.max(eyeHeightM, 0.3), maxEye);
+}
+
 function PlayerController({
   polygons,
   walls,
   spawn,
+  eyeHeightM,
+  ceilingHeightM,
+  fovDeg,
   onPose,
 }: {
   polygons: Polygon[];
   walls: Segment[];
   spawn: Point;
+  eyeHeightM: number;
+  ceilingHeightM: number;
+  fovDeg: number;
   onPose: (pose: { x: number; y: number; yaw: number }) => void;
 }) {
   const { camera, gl } = useThree();
   const keys = useRef<Record<string, boolean>>({});
-  const pos = useRef(new Vector3(spawn.x, EYE_HEIGHT, spawn.y));
+  const eyeY = clampEyeHeight(eyeHeightM, ceilingHeightM);
+  const pos = useRef(new Vector3(spawn.x, eyeY, spawn.y));
   const euler = useRef(new Euler(0, 0, 0, "YXZ"));
   const dir = useRef(new Vector3());
   const forward = useRef(new Vector3());
@@ -62,9 +75,18 @@ function PlayerController({
 
   useEffect(() => {
     const cleared = clearSpawnFromWalls(spawn, polygons, walls, PLAYER_RADIUS);
-    pos.current.set(cleared.x, EYE_HEIGHT, cleared.y);
+    const y = clampEyeHeight(eyeHeightM, ceilingHeightM);
+    pos.current.set(cleared.x, y, cleared.y);
     camera.position.copy(pos.current);
-  }, [camera, polygons, walls, spawn.x, spawn.y, spawn]);
+  }, [camera, polygons, walls, spawn.x, spawn.y, spawn, eyeHeightM, ceilingHeightM]);
+
+  useEffect(() => {
+    if (!(camera instanceof PerspectiveCamera)) {
+      return;
+    }
+    camera.fov = fovDeg;
+    camera.updateProjectionMatrix();
+  }, [camera, fovDeg]);
 
   useEffect(() => {
     const isTypingTarget = (target: EventTarget | null): boolean => {
@@ -154,7 +176,7 @@ function PlayerController({
       }
     }
 
-    pos.current.y = EYE_HEIGHT;
+    pos.current.y = clampEyeHeight(eyeHeightM, ceilingHeightM);
     camera.position.copy(pos.current);
 
     poseAccum.current += dt;
@@ -172,6 +194,8 @@ export function WalkScene({
   polygons,
   internalWalls,
   ceilingHeightM,
+  eyeHeightM,
+  fovDeg,
   wallThickness,
   spawn,
   onPose,
@@ -204,6 +228,9 @@ export function WalkScene({
         polygons={polygons}
         walls={wallSegs}
         spawn={spawn}
+        eyeHeightM={eyeHeightM}
+        ceilingHeightM={ceilingHeightM}
+        fovDeg={fovDeg}
         onPose={onPose}
       />
     </>
