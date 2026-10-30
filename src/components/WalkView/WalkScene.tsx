@@ -1,13 +1,21 @@
 import { PointerLockControls } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
-import { Euler, PerspectiveCamera, Vector3 } from "three";
+import {
+  Euler,
+  Object3D,
+  PerspectiveCamera,
+  Raycaster,
+  Vector2,
+  Vector3,
+} from "three";
 import {
   clearSpawnFromWalls,
   collectWallSegments,
   moveWithCollision,
 } from "../../geometry/walkMesh";
 import type { Point, Polygon, Segment } from "../../geometry/types";
+import type { WallMediaEntry } from "../../store/wallMediaSlice";
 import { FloorCeiling } from "./FloorCeiling";
 import { WallMeshes } from "./WallMeshes";
 
@@ -22,7 +30,10 @@ type WalkSceneProps = {
   fovDeg: number;
   wallThickness: number;
   spawn: Point;
+  mediaByWallId: Record<string, WallMediaEntry>;
+  wallEditOpen: boolean;
   onPose: (pose: { x: number; y: number; yaw: number }) => void;
+  onWallPick: (wallId: string, segment: Segment) => void;
 };
 
 const MOVE_CODES = new Set([
@@ -48,7 +59,9 @@ function PlayerController({
   eyeHeightM,
   ceilingHeightM,
   fovDeg,
+  wallEditOpen,
   onPose,
+  onWallPick,
 }: {
   polygons: Polygon[];
   walls: Segment[];
@@ -56,9 +69,11 @@ function PlayerController({
   eyeHeightM: number;
   ceilingHeightM: number;
   fovDeg: number;
+  wallEditOpen: boolean;
   onPose: (pose: { x: number; y: number; yaw: number }) => void;
+  onWallPick: (wallId: string, segment: Segment) => void;
 }) {
-  const { camera, gl } = useThree();
+  const { camera, gl, scene } = useThree();
   const keys = useRef<Record<string, boolean>>({});
   const eyeY = clampEyeHeight(eyeHeightM, ceilingHeightM);
   const pos = useRef(new Vector3(spawn.x, eyeY, spawn.y));
@@ -68,10 +83,14 @@ function PlayerController({
   const right = useRef(new Vector3());
   const wish = useRef(new Vector3());
   const poseAccum = useRef(0);
+  const raycaster = useRef(new Raycaster());
+  const ndcCenter = useRef(new Vector2(0, 0));
   const polygonsRef = useRef(polygons);
   const wallsRef = useRef(walls);
+  const onWallPickRef = useRef(onWallPick);
   polygonsRef.current = polygons;
   wallsRef.current = walls;
+  onWallPickRef.current = onWallPick;
 
   useEffect(() => {
     const cleared = clearSpawnFromWalls(spawn, polygons, walls, PLAYER_RADIUS);
@@ -89,6 +108,20 @@ function PlayerController({
   }, [camera, fovDeg]);
 
   useEffect(() => {
+    if (wallEditOpen) {
+      keys.current = {};
+      document.body.style.cursor = "auto";
+      if (document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+    } else {
+      // After the dialog closes, focus the WebGL canvas so the next click
+      // can re-engage pointer lock (camera look) without opening a wall.
+      gl.domElement.focus();
+    }
+  }, [wallEditOpen, gl]);
+
+  useEffect(() => {
     const isTypingTarget = (target: EventTarget | null): boolean => {
       if (!(target instanceof HTMLElement)) {
         return false;
@@ -97,13 +130,41 @@ function PlayerController({
       return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
     };
 
+    const pickWallUnderCrosshair = () => {
+      // Only while locked — unlocked clicks must stay free for pointer-lock.
+      if (document.pointerLockElement !== gl.domElement) {
+        return;
+      }
+      raycaster.current.setFromCamera(ndcCenter.current, camera);
+      const hits = raycaster.current.intersectObjects(scene.children, true);
+      for (const hit of hits) {
+        let obj: Object3D | null = hit.object;
+        while (obj) {
+          const data = obj.userData as {
+            wallId?: string;
+            segment?: Segment;
+          };
+          if (data.wallId && data.segment) {
+            onWallPickRef.current(data.wallId, data.segment);
+            return;
+          }
+          obj = obj.parent;
+        }
+      }
+    };
+
     const down = (e: KeyboardEvent) => {
-      if (isTypingTarget(e.target)) {
+      if (wallEditOpen || isTypingTarget(e.target)) {
         return;
       }
       if (MOVE_CODES.has(e.code)) {
         e.preventDefault();
         keys.current[e.code] = true;
+        return;
+      }
+      if (e.code === "KeyE") {
+        e.preventDefault();
+        pickWallUnderCrosshair();
       }
     };
     const up = (e: KeyboardEvent) => {
@@ -115,7 +176,6 @@ function PlayerController({
       keys.current = {};
     };
 
-    // Capture phase so HUD / canvas focus cannot swallow WASD
     window.addEventListener("keydown", down, true);
     window.addEventListener("keyup", up, true);
     window.addEventListener("blur", blur);
@@ -124,21 +184,26 @@ function PlayerController({
       window.removeEventListener("keyup", up, true);
       window.removeEventListener("blur", blur);
     };
-  }, []);
+  }, [camera, scene, wallEditOpen, gl]);
 
   useEffect(() => {
     const onLock = () => {
-      const active = document.activeElement;
-      if (active instanceof HTMLElement) {
-        active.blur();
+      if (document.pointerLockElement) {
+        const active = document.activeElement;
+        if (active instanceof HTMLElement) {
+          active.blur();
+        }
+        gl.domElement.focus();
       }
-      gl.domElement.focus();
     };
     document.addEventListener("pointerlockchange", onLock);
     return () => document.removeEventListener("pointerlockchange", onLock);
   }, [gl]);
 
   useFrame((_, dt) => {
+    if (wallEditOpen) {
+      return;
+    }
     const k = keys.current;
     const forwardAmt = (k.KeyW || k.ArrowUp ? 1 : 0) - (k.KeyS || k.ArrowDown ? 1 : 0);
     const strafeAmt = (k.KeyD || k.ArrowRight ? 1 : 0) - (k.KeyA || k.ArrowLeft ? 1 : 0);
@@ -187,7 +252,13 @@ function PlayerController({
     }
   });
 
-  return <PointerLockControls selector="canvas" />;
+  // Keep controls mounted; disable while editing so remount doesn't break re-lock.
+  return (
+    <PointerLockControls
+      selector="canvas"
+      enabled={!wallEditOpen}
+    />
+  );
 }
 
 export function WalkScene({
@@ -198,7 +269,10 @@ export function WalkScene({
   fovDeg,
   wallThickness,
   spawn,
+  mediaByWallId,
+  wallEditOpen,
   onPose,
+  onWallPick,
 }: WalkSceneProps) {
   const wallSegs = useMemo(
     () => collectWallSegments(polygons, internalWalls),
@@ -222,6 +296,9 @@ export function WalkScene({
         segments={wallSegs}
         height={ceilingHeightM}
         thickness={wallThickness}
+        mediaByWallId={mediaByWallId}
+        editingEnabled={!wallEditOpen}
+        onWallPick={onWallPick}
       />
 
       <PlayerController
@@ -231,7 +308,9 @@ export function WalkScene({
         eyeHeightM={eyeHeightM}
         ceilingHeightM={ceilingHeightM}
         fovDeg={fovDeg}
+        wallEditOpen={wallEditOpen}
         onPose={onPose}
+        onWallPick={onWallPick}
       />
     </>
   );

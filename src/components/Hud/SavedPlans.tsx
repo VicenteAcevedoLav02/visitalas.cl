@@ -11,6 +11,7 @@ import {
   savePlanToLibrary,
   type PlanDocument,
 } from "../../store/planDocument";
+import { replaceWallMedia } from "../../store/wallMediaSlice";
 import styles from "./Hud.module.css";
 
 function formatSavedAt(ts: number): string {
@@ -26,6 +27,7 @@ export function SavedPlans() {
   const dispatch = useAppDispatch();
   const mergeReview = useAppSelector(selectMergeReview);
   const floorPlan = useAppSelector((s) => s.floorPlan);
+  const wallMedia = useAppSelector((s) => s.wallMedia.byWallId);
   const locked = Boolean(mergeReview);
 
   const [name, setName] = useState("");
@@ -56,11 +58,16 @@ export function SavedPlans() {
       floorPlan,
       name || existing?.name || `Plano ${plans.length + 1}`,
       existing?.id,
+      wallMedia,
     );
-    const next = savePlanToLibrary(doc);
-    setName("");
-    refresh(next, `Guardado: ${doc.name}`);
-    setSelectedId(doc.id);
+    try {
+      const next = savePlanToLibrary(doc);
+      setName("");
+      refresh(next, `Guardado: ${doc.name}`);
+      setSelectedId(doc.id);
+    } catch {
+      setStatus("No se pudo guardar (¿fotos muy grandes para localStorage?)");
+    }
   };
 
   const onLoad = (id: string) => {
@@ -73,7 +80,11 @@ export function SavedPlans() {
       return;
     }
     dispatch(loadPlanDocument(doc));
-    setStatus(`Cargado: ${doc.name} (${doc.past.length} undo)`);
+    dispatch(replaceWallMedia(doc.wallMedia ?? {}));
+    const photoCount = Object.keys(doc.wallMedia ?? {}).length;
+    setStatus(
+      `Cargado: ${doc.name} (${doc.past.length} undo${photoCount ? ` · ${photoCount} fotos` : ""})`,
+    );
   };
 
   const onDelete = (id: string) => {
@@ -120,17 +131,26 @@ export function SavedPlans() {
         future: doc.future,
       },
       doc.name,
+      undefined,
+      doc.wallMedia,
     );
-    const next = savePlanToLibrary(imported);
-    dispatch(loadPlanDocument(imported));
-    refresh(next, `Importado: ${imported.name}`);
-    setSelectedId(imported.id);
+    try {
+      const next = savePlanToLibrary(imported);
+      dispatch(loadPlanDocument(imported));
+      dispatch(replaceWallMedia(imported.wallMedia ?? {}));
+      refresh(next, `Importado: ${imported.name}`);
+      setSelectedId(imported.id);
+    } catch {
+      dispatch(loadPlanDocument(imported));
+      dispatch(replaceWallMedia(imported.wallMedia ?? {}));
+      setStatus("Importado en sesión (localStorage lleno)");
+    }
   };
 
   return (
     <div className={styles.plansBlock} aria-label="Planos guardados">
       <span className={styles.label}>Planos de prueba</span>
-      <p className={styles.doorHint}>Incluyen historial undo/redo</p>
+      <p className={styles.doorHint}>Incluyen historial y fotos de muros</p>
 
       <input
         className={styles.doorInput}

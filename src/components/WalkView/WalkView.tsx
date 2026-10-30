@@ -1,7 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import type { Point } from "../../geometry/types";
+import type { Point, Segment } from "../../geometry/types";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   selectPolygons,
@@ -18,7 +18,14 @@ import {
   setEyeHeight,
   setFov,
 } from "../../store/walkSlice";
+import {
+  clearWallMedia,
+  selectWallMediaMap,
+  setWallMedia,
+  type WallMediaEntry,
+} from "../../store/wallMediaSlice";
 import { Minimap } from "./Minimap";
+import { WallPhotoEditor } from "./WallPhotoEditor";
 import { WalkScene } from "./WalkScene";
 import styles from "./WalkView.module.css";
 
@@ -34,6 +41,11 @@ function PointerLockWatcher({ onChange }: { onChange: (locked: boolean) => void 
   return null;
 }
 
+type EditingWall = {
+  wallId: string;
+  segment: Segment;
+};
+
 export function WalkView() {
   const dispatch = useAppDispatch();
   const polygons = useAppSelector(selectPolygons);
@@ -44,13 +56,47 @@ export function WalkView() {
   const fovDeg = useAppSelector(selectFov);
   const spawn = useAppSelector(selectWalkSpawn);
   const sessionKey = useAppSelector(selectWalkSessionKey);
+  const mediaByWallId = useAppSelector(selectWallMediaMap);
 
   const [pose, setPose] = useState<{ x: number; y: number; yaw: number } | null>(null);
   const [locked, setLocked] = useState(false);
+  const [editing, setEditing] = useState<EditingWall | null>(null);
+  const [fadeIn, setFadeIn] = useState(false);
 
   const onPose = useCallback((next: { x: number; y: number; yaw: number }) => {
     setPose(next);
   }, []);
+
+  const onWallPick = useCallback((wallId: string, segment: Segment) => {
+    document.exitPointerLock();
+    setFadeIn(true);
+    // Allow fade paint before mounting dialog
+    window.setTimeout(() => {
+      setEditing({ wallId, segment });
+    }, 180);
+  }, []);
+
+  const closeEditor = useCallback(() => {
+    setEditing(null);
+    setFadeIn(false);
+    document.body.style.cursor = "auto";
+  }, []);
+
+  const saveWallMedia = useCallback(
+    (entry: WallMediaEntry) => {
+      dispatch(setWallMedia(entry));
+      closeEditor();
+    },
+    [closeEditor, dispatch],
+  );
+
+  const clearCurrentWall = useCallback(() => {
+    if (!editing) {
+      return;
+    }
+    dispatch(clearWallMedia(editing.wallId));
+    closeEditor();
+  }, [closeEditor, dispatch, editing]);
 
   if (polygons.length === 0 || !spawn) {
     return <Navigate to="/" replace />;
@@ -90,10 +136,15 @@ export function WalkView() {
             fovDeg={fovDeg}
             wallThickness={wallThickness}
             spawn={spawn}
+            mediaByWallId={mediaByWallId}
+            wallEditOpen={editing != null}
             onPose={onPose}
+            onWallPick={onWallPick}
           />
         </Canvas>
       </div>
+
+      {locked && !editing ? <div className={styles.crosshair} aria-hidden /> : null}
 
       <aside className={styles.hud} aria-label="HUD del recorrido">
         <Minimap
@@ -147,17 +198,35 @@ export function WalkView() {
               }
             />
           </label>
-          <p className={styles.hint}>WASD para caminar · clic para mirar</p>
+          <p className={styles.hint}>
+            WASD · clic captura mira · E (mirando un muro) para foto
+          </p>
         </div>
       </aside>
 
-      {!locked ? (
+      {!locked && !editing ? (
         <p className={styles.lockHint}>Haz clic en la vista para capturar el mouse</p>
       ) : null}
 
       <Link className={styles.backBtn} to="/">
         Volver al plano
       </Link>
+
+      {(fadeIn || editing) && !editing ? (
+        <div className={styles.fadeScrim} aria-hidden />
+      ) : null}
+
+      {editing ? (
+        <WallPhotoEditor
+          wallId={editing.wallId}
+          segment={editing.segment}
+          wallHeightM={ceilingHeightM}
+          existing={mediaByWallId[editing.wallId]}
+          onSave={saveWallMedia}
+          onClear={clearCurrentWall}
+          onClose={closeEditor}
+        />
+      ) : null}
 
       <PointerLockWatcher onChange={setLocked} />
     </div>

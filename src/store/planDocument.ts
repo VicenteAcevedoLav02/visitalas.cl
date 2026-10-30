@@ -4,16 +4,19 @@ import type {
   PlanSnapshot,
 } from "./floorPlanSlice";
 import type { Polygon, Segment } from "../geometry/types";
+import type { WallCornersNorm, WallMediaEntry } from "./wallMediaSlice";
 
-export const PLAN_DOC_VERSION = 1 as const;
+/** v1 = geometry only; v2 adds optional wall photos. */
+export const PLAN_DOC_VERSION = 2 as const;
 const STORAGE_KEY = "visitalas.savedPlans";
 
 /** Serializable floor plan including undo/redo stacks. */
 export type PlanDocument = PlanLoadPayload & {
-  version: typeof PLAN_DOC_VERSION;
+  version: 1 | typeof PLAN_DOC_VERSION;
   id: string;
   name: string;
   savedAt: number;
+  wallMedia?: Record<string, WallMediaEntry>;
 };
 
 export type PlanLibrary = {
@@ -41,6 +44,33 @@ function cloneSnapshot(snapshot: PlanSnapshot): PlanSnapshot {
   };
 }
 
+function cloneCorners(q: WallCornersNorm): WallCornersNorm {
+  return [
+    { x: q[0].x, y: q[0].y },
+    { x: q[1].x, y: q[1].y },
+    { x: q[2].x, y: q[2].y },
+    { x: q[3].x, y: q[3].y },
+  ];
+}
+
+function cloneWallMedia(
+  media: Record<string, WallMediaEntry> | undefined,
+): Record<string, WallMediaEntry> | undefined {
+  if (!media) {
+    return undefined;
+  }
+  const out: Record<string, WallMediaEntry> = {};
+  for (const [id, entry] of Object.entries(media)) {
+    out[id] = {
+      wallId: entry.wallId,
+      sourceDataUrl: entry.sourceDataUrl,
+      bakedDataUrl: entry.bakedDataUrl,
+      cornersNorm: cloneCorners(entry.cornersNorm),
+    };
+  }
+  return out;
+}
+
 function newId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -52,6 +82,7 @@ export function createPlanDocument(
   state: FloorPlanState,
   name: string,
   existingId?: string,
+  wallMedia?: Record<string, WallMediaEntry>,
 ): PlanDocument {
   const trimmed = name.trim() || "Sin nombre";
   return {
@@ -68,6 +99,7 @@ export function createPlanDocument(
     zoom: state.zoom,
     panX: state.panX,
     panY: state.panY,
+    wallMedia: cloneWallMedia(wallMedia),
   };
 }
 
@@ -119,12 +151,53 @@ function isSnapshot(value: unknown): value is PlanSnapshot {
   );
 }
 
+function isCorners(value: unknown): value is WallCornersNorm {
+  return (
+    Array.isArray(value) &&
+    value.length === 4 &&
+    value.every(isPoint)
+  );
+}
+
+function isWallMediaEntry(value: unknown): value is WallMediaEntry {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const e = value as Partial<WallMediaEntry>;
+  return (
+    typeof e.wallId === "string" &&
+    typeof e.sourceDataUrl === "string" &&
+    typeof e.bakedDataUrl === "string" &&
+    isCorners(e.cornersNorm)
+  );
+}
+
+function parseWallMedia(
+  raw: unknown,
+): Record<string, WallMediaEntry> | undefined {
+  if (!raw || typeof raw !== "object") {
+    return undefined;
+  }
+  const out: Record<string, WallMediaEntry> = {};
+  for (const [id, entry] of Object.entries(raw)) {
+    if (isWallMediaEntry(entry)) {
+      out[id] = {
+        wallId: entry.wallId,
+        sourceDataUrl: entry.sourceDataUrl,
+        bakedDataUrl: entry.bakedDataUrl,
+        cornersNorm: cloneCorners(entry.cornersNorm),
+      };
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export function parsePlanDocument(raw: unknown): PlanDocument | null {
   if (!raw || typeof raw !== "object") {
     return null;
   }
   const doc = raw as Partial<PlanDocument>;
-  if (doc.version !== PLAN_DOC_VERSION) {
+  if (doc.version !== 1 && doc.version !== 2) {
     return null;
   }
   if (typeof doc.id !== "string" || typeof doc.name !== "string") {
@@ -155,7 +228,7 @@ export function parsePlanDocument(raw: unknown): PlanDocument | null {
     return null;
   }
   return {
-    version: PLAN_DOC_VERSION,
+    version: doc.version === 1 ? 1 : PLAN_DOC_VERSION,
     id: doc.id,
     name: doc.name,
     savedAt: doc.savedAt,
@@ -168,6 +241,7 @@ export function parsePlanDocument(raw: unknown): PlanDocument | null {
     zoom: doc.zoom,
     panX: doc.panX,
     panY: doc.panY,
+    wallMedia: parseWallMedia(doc.wallMedia),
   };
 }
 
